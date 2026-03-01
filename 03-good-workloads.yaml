@@ -1,0 +1,385 @@
+# =============================================================================
+# ✅ GOOD WORKLOADS — Best practices applied, passes both Popeye and Kyverno
+# =============================================================================
+# All Popeye findings addressed:
+#   ✅ [POP-101] Specific image tags (not :latest)
+#   ✅ [POP-106] Resource requests AND limits defined
+#   ✅ [POP-102] Liveness and readiness probes
+#   ✅ [POP-302] runAsNonRoot security context
+#   ✅ [POP-306] Container-level securityContext set
+#   ✅ [POP-300] Dedicated ServiceAccount (not default)
+#   ✅ [POP-108] Named container ports
+#   ✅ [POP-1204] NetworkPolicy for ingress and egress
+#   ✅ [POP-206] PodDisruptionBudget configured
+#   ✅ 'app' and 'team' labels present
+#   ✅ Read-only root filesystem where possible
+# =============================================================================
+
+---
+# ---------- ServiceAccount: dedicated (not default) ----------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-service-account
+  namespace: audit-enforce
+  labels:
+    app: shared
+    team: platform
+
+---
+# ---------- GOOD Deployment 1: nginx — fully compliant ----------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: good-nginx
+  namespace: audit-enforce
+  labels:
+    app: nginx
+    team: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+      team: frontend
+  template:
+    metadata:
+      labels:
+        app: nginx                    # ✅ Required label
+        team: frontend                # ✅ Required label
+    spec:
+      serviceAccountName: app-service-account  # ✅ Dedicated SA (not default)
+      securityContext:
+        runAsNonRoot: true            # ✅ Pod-level non-root
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: nginx
+          image: nginxinc/nginx-unprivileged:1.27.3  # ✅ Non-root nginx (runs as uid 101)
+          ports:
+            - containerPort: 8080
+              name: http              # ✅ Named port
+              protocol: TCP
+          resources:                  # ✅ Resources defined
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          livenessProbe:              # ✅ Liveness probe
+            httpGet:
+              path: /
+              port: http              # ✅ Named port (not numeric)
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:             # ✅ Readiness probe
+            httpGet:
+              path: /
+              port: http              # ✅ Named port (not numeric)
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          securityContext:
+            runAsNonRoot: true        # ✅ Container non-root
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false  # nginx needs to write to /var/cache
+
+---
+# ---------- GOOD Deployment 2: redis — fully compliant ----------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: good-redis
+  namespace: audit-enforce
+  labels:
+    app: redis
+    team: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: redis
+      team: backend
+  template:
+    metadata:
+      labels:
+        app: redis                    # ✅ Required label
+        team: backend                 # ✅ Required label
+    spec:
+      serviceAccountName: app-service-account  # ✅ Dedicated SA (not default)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999                # redis user
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: redis
+          image: redis:7.4.2          # ✅ Specific version tag
+          ports:
+            - containerPort: 6379
+              name: redis             # ✅ Named port
+              protocol: TCP
+          resources:                  # ✅ Resources defined
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          livenessProbe:              # ✅ Liveness probe
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:             # ✅ Readiness probe
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false  # redis needs /data
+
+---
+# ---------- GOOD Service: properly configured ----------
+apiVersion: v1
+kind: Service
+metadata:
+  name: good-nginx-svc
+  namespace: audit-enforce
+  labels:
+    app: nginx
+    team: frontend
+spec:
+  selector:
+    app: nginx
+    team: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http              # ✅ Named port reference → resolves to 8080
+      protocol: TCP
+
+---
+# ---------- GOOD Service: redis ----------
+apiVersion: v1
+kind: Service
+metadata:
+  name: good-redis-svc
+  namespace: audit-enforce
+  labels:
+    app: redis
+    team: backend
+spec:
+  selector:
+    app: redis
+    team: backend
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis             # ✅ Named port reference (not numeric)
+      protocol: TCP
+
+---
+# ---------- GOOD Deployment 3: busybox — fully compliant ----------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: good-busybox
+  namespace: audit-enforce
+  labels:
+    app: busybox
+    team: tools
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: busybox
+      team: tools
+  template:
+    metadata:
+      labels:
+        app: busybox                  # ✅ Required label
+        team: tools                   # ✅ Required label
+    spec:
+      serviceAccountName: app-service-account  # ✅ Dedicated SA (not default)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534              # nobody user
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: busybox
+          image: busybox:1.37.0       # ✅ Specific version tag
+          command: ["sh", "-c", "while true; do echo hello; sleep 10; done"]
+          resources:                  # ✅ Resources defined
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:              # ✅ Liveness probe
+            exec:
+              command:
+                - sh
+                - -c
+                - echo alive
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:             # ✅ Readiness probe
+            exec:
+              command:
+                - sh
+                - -c
+                - echo ready
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+
+---
+# =============================================================================
+# ✅ NetworkPolicy — Secures pod ingress and egress
+# Fixes Popeye: [POP-1204] Pod ingress/egress not secured by a network policy
+# =============================================================================
+
+# ---------- NetworkPolicy: allow nginx ingress on port 80 ----------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-nginx-ingress
+  namespace: audit-enforce
+  labels:
+    app: nginx
+    team: frontend
+spec:
+  podSelector:
+    matchLabels:
+      app: nginx
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - port: 8080
+          protocol: TCP
+  egress:
+    - {}                              # Allow all egress (DNS, etc.)
+
+---
+# ---------- NetworkPolicy: allow redis ingress on port 6379 ----------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-redis-ingress
+  namespace: audit-enforce
+  labels:
+    app: redis
+    team: backend
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - port: 6379
+          protocol: TCP
+  egress:
+    - {}
+
+---
+# ---------- NetworkPolicy: busybox egress only ----------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-busybox-egress
+  namespace: audit-enforce
+  labels:
+    app: busybox
+    team: tools
+spec:
+  podSelector:
+    matchLabels:
+      app: busybox
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    - {}
+
+---
+# =============================================================================
+# ✅ PodDisruptionBudgets — Ensures availability during disruptions
+# Fixes Popeye: [POP-206] Pod has no associated PodDisruptionBudget
+# =============================================================================
+
+# ---------- PDB: nginx (has 2 replicas) ----------
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: good-nginx-pdb
+  namespace: audit-enforce
+  labels:
+    app: nginx
+    team: frontend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: nginx
+      team: frontend
+
+---
+# ---------- PDB: redis (has 2 replicas) ----------
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: good-redis-pdb
+  namespace: audit-enforce
+  labels:
+    app: redis
+    team: backend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: redis
+      team: backend
+
+---
+# ---------- PDB: busybox (has 2 replicas) ----------
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: good-busybox-pdb
+  namespace: audit-enforce
+  labels:
+    app: busybox
+    team: tools
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: busybox
+      team: tools

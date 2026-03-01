@@ -1,0 +1,108 @@
+# =============================================================================
+# 🚨 BAD WORKLOADS — Intentionally misconfigured for demo
+# =============================================================================
+# Issues Popeye will find:
+#   ❌ [POP-101] Using :latest image tag
+#   ❌ [POP-106] No resource requests or limits
+#   ❌ [POP-102] No liveness or readiness probes
+#   ❌ [POP-302] Running as root (no securityContext)
+#   ❌ [POP-306] Container could run as root
+#   ❌ [POP-300] Uses "default" ServiceAccount
+#   ❌ [POP-108] Unnamed container ports
+#   ❌ [POP-1204] No NetworkPolicy (ingress/egress)
+#   ❌ [POP-206] No PodDisruptionBudget
+#   ❌ Missing recommended labels
+# =============================================================================
+
+---
+# ---------- BAD Deployment 1: nginx with every anti-pattern ----------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bad-nginx
+  namespace: audit-enforce
+  # ❌ No labels on Deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      run: bad-nginx
+  template:
+    metadata:
+      labels:
+        run: bad-nginx
+        # ❌ Missing 'app' and 'team' labels
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest        # ❌ Using :latest tag
+          ports:
+            - containerPort: 80
+          # ❌ No resource requests/limits
+          # ❌ No liveness probe
+          # ❌ No readiness probe
+          # ❌ No securityContext (runs as root)
+
+---
+# ---------- BAD Deployment 2: redis with every anti-pattern ----------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bad-redis
+  namespace: audit-enforce
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: bad-redis
+  template:
+    metadata:
+      labels:
+        run: bad-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:latest         # ❌ Using :latest tag
+          ports:
+            - containerPort: 6379
+          # ❌ No resource requests/limits
+          # ❌ No liveness/readiness probes
+          # ❌ No securityContext
+
+---
+# ---------- BAD Service: mismatched or poorly configured ----------
+apiVersion: v1
+kind: Service
+metadata:
+  name: bad-nginx-svc
+  namespace: audit-enforce
+spec:
+  selector:
+    run: bad-nginx
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+
+---
+# ---------- BAD Deployment 3: busybox as root ----------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bad-busybox
+  namespace: audit-enforce
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: bad-busybox
+  template:
+    metadata:
+      labels:
+        run: bad-busybox
+    spec:
+      containers:
+        - name: busybox
+          image: busybox:latest       # ❌ Using :latest tag
+          command: ["sh", "-c", "while true; do echo hello; sleep 10; done"]
+          # ❌ No resources, no probes, no securityContext
