@@ -47,6 +47,7 @@ spec:
       labels:
         app: nginx                    # ✅ Required label
         team: frontend                # ✅ Required label
+        run: bad-nginx                # ✅ Matches bad-nginx-svc selector (POP-1100 fix)
     spec:
       serviceAccountName: app-service-account  # ✅ Dedicated SA (not default)
       securityContext:
