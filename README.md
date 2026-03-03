@@ -183,18 +183,18 @@ kubectl apply -f 02-kyverno-policies.yaml
 
 Check the policies are active:
 ```bash
-kubectl get validatingpolicy,mutatingpolicy
+kubectl get clusterpolicy
 ```
 
 **Policies we're enforcing:**
 
 | # | Policy | What It Does | Mode |
 |---|--------|-------------|------|
-| 1 | `require-resource-limits` | Blocks pods without CPU/memory limits | **Deny** |
-| 2 | `disallow-latest-tag` | Blocks images using `:latest` tag | **Deny** |
-| 3 | `require-probes` | Blocks pods without liveness/readiness probes | **Deny** |
-| 4 | `require-run-as-non-root` | Blocks containers running as root | **Deny** |
-| 5 | `require-labels` | Blocks pods without `app` and `team` labels | **Deny** |
+| 1 | `disallow-latest-tag` | Blocks images using `:latest` tag | **Enforce** |
+| 2 | `require-resource-limits` | Blocks pods without CPU/memory limits | **Enforce** |
+| 3 | `require-probes` | Blocks pods without liveness/readiness probes | **Enforce** |
+| 4 | `require-run-as-non-root` | Blocks containers running as root | **Enforce** |
+| 5 | `require-labels` | Blocks pods without `app` and `team` labels | **Enforce** |
 | 6 | `add-default-resources` | Auto-adds default requests if missing | **Mutate** |
 
 ---

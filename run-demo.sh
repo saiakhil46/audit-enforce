@@ -164,7 +164,7 @@ kubectl apply -f "$DEMO_DIR/02-kyverno-policies.yaml"
 echo ""
 success "Policies applied!"
 echo ""
-kubectl get validatingpolicy,mutatingpolicy
+kubectl get clusterpolicy
 pause
 
 # =============================================================================
