@@ -16,7 +16,8 @@
 | 4 | Install Kyverno and apply **policies** | 🛡️ **Kyverno** |
 | 5 | Try to deploy the **same bad workloads** — blocked! | 🛡️ **Kyverno** |
 | 6 | Deploy **fixed workloads** — everything passes | ✅ Both tools |
-| 7 | Re-scan with Popeye — clean report | 🔍 **Popeye** |
+| 7 | Test Kyverno **mutation** — auto-inject resource requests | 🛡️ **Kyverno** |
+| 8 | Re-scan with Popeye — clean report | 🔍 **Popeye** |
 
 ---
 
@@ -40,6 +41,7 @@ audit-enforce/
 ├── 01-bad-workloads.yaml      # Intentionally misconfigured workloads
 ├── 02-kyverno-policies.yaml   # Kyverno policies (the gatekeeper)
 ├── 03-good-workloads.yaml     # Fixed workloads that pass everything
+├── 04-test-mutate.yaml        # Test pod for Kyverno mutation policy
 └── run-demo.sh                # One-click demo script (optional)
 ```
 
@@ -260,7 +262,42 @@ kubectl get pods -n audit-enforce --show-labels
 
 ---
 
-### STEP 7: 🔍 Re-scan with Popeye — Clean Report!
+### STEP 7: 🧪 Test Kyverno Mutation — Auto-Inject Resource Requests
+
+> "Let's see Kyverno's mutation in action — deploy a pod with NO resource requests and watch Kyverno add them automatically..."
+
+Deploy a pod without resource requests:
+```bash
+kubectl apply -f 04-test-mutate.yaml
+```
+
+Check if Kyverno injected default resource requests:
+```bash
+kubectl get pod test-mutate-pod -n audit-enforce -o jsonpath='{.spec.containers[0].resources}' | jq
+```
+
+**Expected Output:**
+```json
+{
+  "requests": {
+    "cpu": "100m",
+    "memory": "128Mi"
+  }
+}
+```
+
+> 🎉 **Kyverno automatically added default resource requests!**
+> The `add-default-resources` policy acts as a safety net — if someone
+> forgets to add requests, Kyverno injects sensible defaults.
+
+Cleanup the test pod:
+```bash
+kubectl delete -f 04-test-mutate.yaml
+```
+
+---
+
+### STEP 8: 🔍 Re-scan with Popeye — Clean Report!
 
 > "Let's ask our auditor to check again..."
 

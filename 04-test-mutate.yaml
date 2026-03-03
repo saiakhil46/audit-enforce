@@ -1,0 +1,34 @@
+# =============================================================================
+# 🧪 Test: add-default-resources Mutating Policy
+# =============================================================================
+# This Pod has NO resource requests defined.
+# Kyverno's "add-default-resources" policy should automatically inject:
+#   cpu: 100m
+#   memory: 128Mi
+#
+# Usage:
+#   kubectl apply -f 04-test-mutate.yaml
+#   kubectl get pod test-mutate-pod -n audit-enforce -o jsonpath='{.spec.containers[0].resources}' | jq
+#
+# Expected output:
+#   { "requests": { "cpu": "100m", "memory": "128Mi" } }
+#
+# Cleanup:
+#   kubectl delete -f 04-test-mutate.yaml
+# =============================================================================
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-mutate-pod
+  namespace: audit-enforce
+  labels:
+    app: test-mutate
+    team: testing
+spec:
+  containers:
+    - name: busybox
+      image: busybox:1.37.0
+      command: ["sh", "-c", "echo hello && sleep 3600"]
+      # ❌ No resources defined — Kyverno should auto-add requests!
