@@ -104,7 +104,7 @@ kubectl get nodes
 
 ```bash
 cd audit-enforce
-kind create cluster --name auditor-gatekeeper --config 00-kind-cluster.yaml
+kind create cluster --name audit-enforce --config 00-kind-cluster.yaml
 ```
 
 Verify:
@@ -112,7 +112,7 @@ Verify:
 ```bash
 kubectl get nodes
 # NAME                               STATUS   ROLES           AGE   VERSION
-# auditor-gatekeeper-control-plane   Ready    control-plane   30s   v1.31.0
+# audit-enforce-control-plane   Ready    control-plane   30s   v1.31.0
 ```
 
 ---
@@ -120,7 +120,7 @@ kubectl get nodes
 ## Cleanup
 
 ```bash
-kind delete cluster --name auditor-gatekeeper
+kind delete cluster --name audit-enforce
 ```
 
 ---

@@ -53,7 +53,7 @@ audit-enforce/
 
 ```bash
 cd audit-enforce
-kind create cluster --name auditor-gatekeeper --config 00-kind-cluster.yaml
+kind create cluster --name audit-enforce --config 00-kind-cluster.yaml
 ```
 
 Verify the cluster is running:
@@ -309,7 +309,7 @@ POPEYE_REPORT_DIR=$(pwd) popeye -n audit-enforce --save --out html --output-file
 
 ```bash
 # Delete everything
-kind delete cluster --name auditor-gatekeeper
+kind delete cluster --name audit-enforce
 ```
 
 ---

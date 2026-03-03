@@ -57,12 +57,12 @@ pause
 header "STEP 0: Create Kind Cluster"
 # =============================================================================
 
-info "Creating kind cluster 'auditor-gatekeeper'..."
+info "Creating kind cluster 'audit-enforce'..."
 
 # Delete if exists
-kind delete cluster --name auditor-gatekeeper 2>/dev/null || true
+kind delete cluster --name audit-enforce 2>/dev/null || true
 
-kind create cluster --name auditor-gatekeeper --config "$DEMO_DIR/00-kind-cluster.yaml"
+kind create cluster --name audit-enforce --config "$DEMO_DIR/00-kind-cluster.yaml"
 
 success "Kind cluster created!"
 echo ""
@@ -251,5 +251,5 @@ header "🧹 CLEANUP"
 
 echo -e "Run the following to clean up:"
 echo ""
-echo -e "  ${CYAN}kind delete cluster --name auditor-gatekeeper${NC}"
+echo -e "  ${CYAN}kind delete cluster --name audit-enforce${NC}"
 echo ""
