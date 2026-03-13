@@ -70,19 +70,6 @@ kubectl cluster-info
 echo ""
 kubectl get nodes
 echo ""
-
-info "Installing metrics-server (needed by Popeye for resource utilization checks)..."
-kubectl apply -f "$DEMO_DIR/00-metrics-server.yaml"
-
-echo ""
-info "Waiting for metrics-server to be ready..."
-kubectl wait --for=condition=ready pod -l k8s-app=metrics-server -n kube-system --timeout=120s
-
-success "Metrics-server installed!"
-echo ""
-info "Waiting 30s for metrics to be collected..."
-sleep 30
-kubectl top nodes || true
 pause
 
 # =============================================================================

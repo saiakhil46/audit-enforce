@@ -9,7 +9,7 @@ potential issues with deployed resources and configurations.
 
 - Scans **live clusters** (not static YAML files)
 - Detects misconfigurations, stale resources, and anti-patterns
-- Checks resource utilization (if metrics-server is installed)
+- Checks resource requests/limits configuration
 - Reports missing probes, resource limits, security issues, unused resources
 - Generates reports in multiple formats (console, HTML, JSON, YAML, Prometheus)
 - **Read-only** — never modifies any cluster resources
@@ -82,72 +82,6 @@ kubectl popeye
 ```bash
 popeye version
 ```
-
----
-
-## Install Metrics Server (Required for Full Scans)
-
-Popeye relies on the **Kubernetes Metrics API** to check CPU and memory
-utilization of pods and nodes. Without a metrics-server, Popeye will show
-💥 under `MetricServer` and **skip all resource utilization checks**.
-
-### What metrics-server enables in Popeye
-
-| Check | What Popeye Reports |
-|-------|-------------------|
-| CPU over-utilization | ⚠️ Pod using >80% of its CPU limit |
-| CPU under-utilization | ⚠️ Pod requested way more CPU than it uses (waste) |
-| Memory over-utilization | ⚠️ Pod near its memory limit (OOM risk) |
-| Memory under-utilization | ⚠️ Pod requested too much memory (waste) |
-| Node resource pressure | 💥 Node CPU/memory above threshold |
-
-### Check if metrics-server is already installed
-
-```bash
-kubectl get deployment metrics-server -n kube-system
-```
-
-If it exists and is running, you're good — skip to the next section.
-
-### Install on Kind / Minikube / bare-metal clusters
-
-For **kind** clusters, use the manifest included in this repo (pre-configured
-with `--kubelet-insecure-tls` for kind compatibility):
-
-```bash
-kubectl apply -f 00-metrics-server.yaml
-```
-
-For other clusters, use the official manifest:
-
-```bash
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-```
-
-> ⚠️ On **kind** or self-signed clusters, the official manifest will fail with
-> TLS errors. Use `00-metrics-server.yaml` instead which includes the
-> `--kubelet-insecure-tls` and `--kubelet-preferred-address-types=InternalIP` flags.
-
-### Install on managed clusters (EKS / GKE / AKS)
-
-- **EKS**: `kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml`
-- **GKE**: Metrics-server is **pre-installed** — no action needed.
-- **AKS**: Metrics-server is **pre-installed** — no action needed.
-
-### Verify metrics-server is running
-
-```bash
-kubectl wait --for=condition=ready pod -l k8s-app=metrics-server -n kube-system --timeout=120s
-```
-
-### Verify metrics are flowing (wait ~60s after install)
-
-```bash
-kubectl top nodes
-kubectl top pods -A
-```
-
-If `kubectl top` returns data, Popeye will have full access to utilization metrics.
 
 ---
 

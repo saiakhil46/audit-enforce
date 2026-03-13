@@ -37,7 +37,6 @@
 audit-enforce/
 ├── README.md                  # This file — full walkthrough
 ├── 00-kind-cluster.yaml       # Kind cluster config
-├── 00-metrics-server.yaml     # Metrics server (needed by Popeye)
 ├── 01-bad-workloads.yaml      # Intentionally misconfigured workloads
 ├── 02-kyverno-policies.yaml   # Kyverno policies (the gatekeeper)
 ├── 03-good-workloads.yaml     # Fixed workloads that pass everything
@@ -63,25 +62,6 @@ Verify the cluster is running:
 kubectl cluster-info
 kubectl get nodes
 ```
-
-Install **metrics-server** (required by Popeye for resource utilization checks):
-```bash
-kubectl apply -f 00-metrics-server.yaml
-```
-
-Wait for metrics-server to be ready:
-```bash
-kubectl wait --for=condition=ready pod -l k8s-app=metrics-server -n kube-system --timeout=120s
-```
-
-Verify metrics are flowing (wait ~60 seconds after install):
-```bash
-kubectl top nodes
-```
-
-> 💡 **Why metrics-server?** Popeye uses it to check if pods are over/under
-> utilizing CPU and memory. Without it, Popeye shows a 💥 under MetricServer
-> and skips all resource utilization checks.
 
 ---
 
