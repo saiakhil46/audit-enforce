@@ -1,0 +1,240 @@
+# =============================================================================
+# 🛡️ KYVERNO POLICIES — The Gatekeeper Rules
+# =============================================================================
+# These policies enforce the best practices that Popeye audits for.
+# Each policy maps to a specific Popeye finding.
+#
+# Uses Kyverno ClusterPolicy (kyverno.io/v1) with simple YAML patterns
+# — no CEL expressions, easy to read and understand!
+# =============================================================================
+
+---
+# =============================================================================
+# POLICY 1: Disallow :latest image tag
+# Maps to Popeye: [POP-106] Container image using :latest tag
+# =============================================================================
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow Latest Tag
+    policies.kyverno.io/description: >-
+      Using the :latest tag is not recommended as it leads to unpredictable
+      deployments. Specify a specific image version instead.
+    policies.kyverno.io/severity: medium
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: disallow-latest-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+      validate:
+        message: >-
+          The image tag ':latest' is not allowed. Use a specific version tag
+          (e.g., nginx:1.27.3).
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - image: "!*:latest"
+
+---
+# =============================================================================
+# POLICY 2: Require resource limits
+# Maps to Popeye: [POP-106] No resource limits, [POP-107] No resource requests
+# =============================================================================
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resource-limits
+  annotations:
+    policies.kyverno.io/title: Require Resource Limits
+    policies.kyverno.io/description: >-
+      All containers must define CPU and memory resource requests and limits.
+      This prevents resource starvation and ensures proper scheduling.
+    policies.kyverno.io/severity: medium
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: require-resource-limits
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+      validate:
+        message: >-
+          All containers must have CPU and memory requests and limits defined.
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - resources:
+                      requests:
+                        cpu: "?*"
+                        memory: "?*"
+                      limits:
+                        cpu: "?*"
+                        memory: "?*"
+
+---
+# =============================================================================
+# POLICY 3: Require liveness and readiness probes
+# Maps to Popeye: [POP-100] No liveness probe, [POP-101] No readiness probe
+# =============================================================================
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-probes
+  annotations:
+    policies.kyverno.io/title: Require Liveness and Readiness Probes
+    policies.kyverno.io/description: >-
+      Liveness and readiness probes are required to ensure Kubernetes
+      can properly manage container health and traffic routing.
+    policies.kyverno.io/severity: medium
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: require-probes
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.template.spec.containers[] | length(@) }}"
+            operator: GreaterThan
+            value: 0
+      validate:
+        message: >-
+          All containers must have liveness and readiness probes defined.
+        foreach:
+          - list: "request.object.spec.template.spec.containers"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.livenessProbe || '' }}"
+                    operator: Equals
+                    value: ""
+                  - key: "{{ element.readinessProbe || '' }}"
+                    operator: Equals
+                    value: ""
+
+---
+# =============================================================================
+# POLICY 4: Require runAsNonRoot
+# Maps to Popeye: [POP-302] Container runs as root
+# =============================================================================
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-run-as-non-root
+  annotations:
+    policies.kyverno.io/title: Require Run As Non-Root
+    policies.kyverno.io/description: >-
+      Containers must run as non-root users for security.
+      Running as root can lead to container escape vulnerabilities.
+    policies.kyverno.io/severity: high
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: require-run-as-non-root
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+      validate:
+        message: >-
+          Containers must set securityContext.runAsNonRoot to true.
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - securityContext:
+                      runAsNonRoot: true
+
+---
+# =============================================================================
+# POLICY 5: Require app and team labels
+# Maps to Popeye: Labels best practice
+# =============================================================================
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-labels
+  annotations:
+    policies.kyverno.io/title: Require App and Team Labels
+    policies.kyverno.io/description: >-
+      All pods must have 'app' and 'team' labels for identification
+      and operational management.
+    policies.kyverno.io/severity: medium
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: require-labels
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+      validate:
+        message: >-
+          The labels 'app' and 'team' are required on pod templates.
+        pattern:
+          spec:
+            template:
+              metadata:
+                labels:
+                  app: "?*"
+                  team: "?*"
+
+---
+# =============================================================================
+# POLICY 6 (MUTATE): Auto-add default resource requests
+# Bonus: Shows Kyverno's mutation capability
+# =============================================================================
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: add-default-resources
+  annotations:
+    policies.kyverno.io/title: Add Default Resource Requests
+    policies.kyverno.io/description: >-
+      Automatically add default CPU and memory requests if not specified.
+      This is a safety net — validation policies still enforce limits.
+spec:
+  rules:
+    - name: add-default-resources
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      mutate:
+        patchStrategicMerge:
+          spec:
+            containers:
+              - (name): "*"
+                resources:
+                  requests:
+                    +(cpu): "100m"
+                    +(memory): "128Mi"
